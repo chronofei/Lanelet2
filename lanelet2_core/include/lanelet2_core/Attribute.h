@@ -15,6 +15,11 @@ template <typename ValueT>
 struct ValueOf {
   using Type = std::decay_t<ValueT>;
 };
+
+/**
+ * 以下定义为上面定义的一个具体化，即当模板类型为Optional<ValueT>时，优先调用下面的
+ * 定义。
+ **/
 template <typename ValueT>
 struct ValueOf<Optional<ValueT>> {
   using Type = ValueT;
@@ -29,14 +34,20 @@ struct ValueOf<Optional<ValueT>> {
     * as.. function are very cheap.
     */
 class Attribute {
+  /**
+   * 使用ValueOfT时需要指定模板参数，如ValueOfT<int>。
+   */
   template <typename T>
   using ValueOfT = typename internal::ValueOf<T>::Type;
 
  public:
+  // boost库里面的联合类型，类似C++中的union
   using Cache = boost::variant<bool, double, Id, int, Velocity>;
 
+  // 定义非默认构造函数后，同时指定生成默认构造函数
   Attribute() = default;
   Attribute(const std::string& value) : value_{value} {}        // NOLINT
+  // T&& 为右值引用
   Attribute(std::string&& value) : value_{std::move(value)} {}  // NOLINT
   Attribute(const char* value) : value_(value) {}               // NOLINT
   Attribute(bool value);                                        // NOLINT

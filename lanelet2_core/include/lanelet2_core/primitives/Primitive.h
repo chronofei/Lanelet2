@@ -145,8 +145,9 @@ class ConstPrimitive {
       return defaultVal;
     }
     auto val = elem->second.template as<T>();
+    // 如果val被初始化
     if (!!val) {
-      return *val;
+      return *val;  // 用*号运算符取出boost::optional中存储的值
     }
     return defaultVal;
   }
@@ -323,6 +324,7 @@ constexpr bool isLaneletPrimitive() {
 }
 }  // namespace traits
 
+// 生成hash值
 template <typename PrimitiveT>
 struct HashBase {
   size_t operator()(const PrimitiveT& x) const noexcept { return std::hash<Id>()(x.id()); }

@@ -32,6 +32,7 @@ class VisitedLaneletGraph {
     visited_[v] = VisitationCount{};
   }
 
+  // v为e的源点
   //! Adds an edge
   void add(LaneletVertexId v, NextToRouteGraph::edge_descriptor e, const NextToRouteGraph& g) {
     auto type = g[e].relation;
@@ -61,8 +62,7 @@ class VisitedLaneletGraph {
         remove(vertex, g);
       }
     }
-  }
-
+  } 
   //! Clears the graph
   void clear() {
     for (auto& vertex : visited_) {
@@ -220,6 +220,7 @@ class NeighbouringGraphVisitor : public boost::default_bfs_visitor {
     vCurr_ = v;
   }
 
+  // 检查出度边
   // called directly after an all its edges
   void examine_edge(NextToRouteGraph::edge_descriptor e, const NextToRouteGraph& g) const {  // NOLINT
     assert(vCurr_ == boost::source(e, g) && "Breadth first search seems to iterate in a weird manner");
@@ -389,6 +390,7 @@ class RouteUnderConstruction {
  private:
   LaneletVertexId begin_;
   LaneletVertexId end_;
+  // using RouteLanelets = std::set<LaneletVertexId>
   RouteLanelets laneletsOnRoute_;  //! Lanelets already determined to be on the route
   const OriginalGraph& originalGraph_;
   OnRouteGraph routeGraph_;
@@ -416,6 +418,7 @@ Optional<Route> RouteBuilder::getRouteFromShortestPath(const LaneletPath& path, 
   bool progress = true;
   while (progress) {
     progress = routeUnderConstruction.addAdjacentLaneletsToRoute();
+
   }
   return routeUnderConstruction.finalizeRoute(originalGraph, path);
 }

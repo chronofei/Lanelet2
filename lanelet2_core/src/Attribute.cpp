@@ -30,12 +30,14 @@ Optional<Velocity> getUnit(const std::string& value, size_t pos) {
 template <typename T>
 T store(std::shared_ptr<Attribute::Cache>& cache, T&& value) {
   auto newCache = std::make_shared<Attribute::Cache>(value);
+  // 用newCache替换cache指向地方的值
   std::atomic_store_explicit(&cache, newCache, std::memory_order_release);
   return value;
 }
 
 template <typename T>
 T* load(const std::shared_ptr<Attribute::Cache>& cache) {
+  // 自动获取cache指向的值
   auto c = std::atomic_load_explicit(&cache, std::memory_order_acquire);
   if (!c) {
     return nullptr;

@@ -40,6 +40,7 @@ using internal::LaneletVertexId;
 using internal::RoutingGraphGraph;
 using internal::VertexVisitInformation;
 
+// 调整容器的大小为size
 template <typename T>
 T reservedVector(size_t size) {
   T t;
@@ -95,6 +96,7 @@ PointT createPoint(const ConstLaneletOrArea& ll) {
   return p;
 }
 
+// 在图graph中找到顶点vertex的出度边，找到第一个出度边所对应的汇点的laneletOrArea
 /** @brief Implementation function to retrieve a neighboring vertex
  *  @throws RoutingGraphError if 'throwOnError' is true and there is more than one neighboring lanelet
  *  @param vertex Start vertex
@@ -118,6 +120,7 @@ Optional<ConstLaneletOrArea> neighboringImpl(const GraphType::vertex_descriptor 
   return {};
 }
 
+// 在图中找到一个邻居顶点，并且这个邻居顶点是lanelet
 Optional<ConstLanelet> neighboringLaneletImpl(const GraphType::vertex_descriptor vertex,
                                               const FilteredRoutingGraph& graph, bool throwOnError = false) {
   auto value = neighboringImpl(vertex, graph, throwOnError);
@@ -127,6 +130,7 @@ Optional<ConstLanelet> neighboringLaneletImpl(const GraphType::vertex_descriptor
   return {};
 }
 
+// 判断llt是否在图g中，若在，则执行函数f
 template <typename Func>
 Optional<ConstLaneletOrArea> ifInGraph(const RoutingGraphGraph& g, const ConstLaneletOrArea& llt, Func f) {
   auto vertex = g.getVertex(llt);
@@ -136,6 +140,7 @@ Optional<ConstLaneletOrArea> ifInGraph(const RoutingGraphGraph& g, const ConstLa
   return f(*vertex);
 }
 
+// 判断llt是否在图g中，若在则执行函数f
 template <typename Func>
 Optional<ConstLanelet> ifLaneletInGraph(const RoutingGraphGraph& g, const ConstLanelet& llt, Func f) {
   auto laneletVertex = g.getVertex(llt);
@@ -145,6 +150,7 @@ Optional<ConstLanelet> ifLaneletInGraph(const RoutingGraphGraph& g, const ConstL
   return f(*laneletVertex);
 }
 
+// 一直执行函数next，直到函数返回类型未初始化
 template <typename Func>
 ConstLanelets getUntilEnd(const ConstLanelet& start, Func next) {
   auto result = reservedVector<ConstLanelets>(3);
@@ -155,6 +161,7 @@ ConstLanelets getUntilEnd(const ConstLanelet& start, Func next) {
   return result;
 }
 
+// 在图graph中找到与laneletOrArea相邻的laneletOrArea，根据edgesOut，判断是出度边的邻居，还是入度边的邻居
 ConstLaneletOrAreas getAllEdgesFromGraph(const RoutingGraphGraph& graph, const FilteredRoutingGraph& subgraph,
                                          const ConstLaneletOrArea& laneletOrArea, bool edgesOut) {
   ConstLaneletOrAreas result;
@@ -175,6 +182,7 @@ ConstLaneletOrAreas getAllEdgesFromGraph(const RoutingGraphGraph& graph, const F
                   : processEdges(boost::in_edges(*laneletVertex, subgraph));
 }
 
+// 在图graph中找到lanelet的邻居，根据edgeOut，判断是出度边的邻居，还是入度边的邻居，且邻居必须是lanelet
 ConstLanelets getLaneletEdgesFromGraph(const RoutingGraphGraph& graph, const FilteredRoutingGraph& subgraph,
                                        const ConstLanelet& lanelet, bool edgesOut) {
   ConstLanelets result;
@@ -205,6 +213,7 @@ struct GetGraph<false> {
   }
 };
 
+// 根据dijkstra生成的最短路径树，最终生成最短路径
 template <bool Backw, typename OutVertexT, typename GraphT>
 std::vector<OutVertexT> buildPath(const DijkstraSearchMap<LaneletVertexId>& map, LaneletVertexId vertex, GraphT g) {
   const auto* currInfo = &map.at(vertex);
@@ -222,6 +231,7 @@ std::vector<OutVertexT> buildPath(const DijkstraSearchMap<LaneletVertexId>& map,
   return path;
 }
 
+// 从start出发计算最短路径，有些点是无法到达的，返回到这些点的可能路径
 template <bool Backw, typename OutVertexT, typename OutContainerT, typename Func>
 std::vector<OutContainerT> possiblePathsImpl(const GraphType::vertex_descriptor& start,
                                              const FilteredRoutingGraph& graph, Func stopCriterion) {
@@ -241,6 +251,7 @@ std::vector<OutContainerT> possiblePathsImpl(const GraphType::vertex_descriptor&
   return result;
 }
 
+// 从start出发，在图中找到能到达的点，返回点的集合
 template <bool Backw, typename OutVertexT, typename Func>
 std::vector<OutVertexT> reachableSetImpl(const GraphType::vertex_descriptor& start, const FilteredRoutingGraph& graph,
                                          Func stopCriterion) {
@@ -257,6 +268,7 @@ std::vector<OutVertexT> reachableSetImpl(const GraphType::vertex_descriptor& sta
   return result;
 }
 
+// 若lanelet的数量超过n则返回false
 template <bool Eq = false>
 struct StopIfLaneletsMoreThan {
   explicit StopIfLaneletsMoreThan(size_t n) : n{n} {}
@@ -266,6 +278,7 @@ struct StopIfLaneletsMoreThan {
   }
   size_t n;
 };
+// 若代v的代价值超过c则返回false
 template <bool Eq = false>
 struct StopIfCostMoreThan {
   explicit StopIfCostMoreThan(double c) : c{c} {}
@@ -276,6 +289,7 @@ struct StopIfCostMoreThan {
   double c;
 };
 
+// 基于from、to和dijkstra算法，实现最短路径
 template <typename PathT, typename PrimT>
 Optional<PathT> shortestPathImpl(const PrimT& from, const PrimT& to, RoutingCostId routingCostId, bool withLaneChanges,
                                  bool withAreas, const internal::RoutingGraphGraph& graph) {
@@ -303,6 +317,7 @@ Optional<PathT> shortestPathImpl(const PrimT& from, const PrimT& to, RoutingCost
   return {};
 }
 
+// 实现最短路径，但是要经过某一个lanelet
 template <typename RetT, typename Primitives, typename ShortestPathFunc>
 Optional<RetT> shortestPathViaImpl(Primitives routePoints, ShortestPathFunc&& shortestPath) {
   Primitives path;
@@ -323,17 +338,20 @@ RoutingGraph::RoutingGraph(RoutingGraph&& /*other*/) noexcept = default;
 RoutingGraph& RoutingGraph::operator=(RoutingGraph&& /*other*/) noexcept = default;
 RoutingGraph::~RoutingGraph() = default;
 
+// 根据laneletMap，trafficRules, routingCosts构建图结构
 RoutingGraphUPtr RoutingGraph::build(const LaneletMap& laneletMap, const traffic_rules::TrafficRules& trafficRules,
                                      const RoutingCostPtrs& routingCosts, const RoutingGraph::Configuration& config) {
   return internal::RoutingGraphBuilder(trafficRules, routingCosts, config).build(laneletMap);
 }
 
+// 根据laneletMap，trafficRules, routingCosts构建图结构
 RoutingGraphUPtr RoutingGraph::build(const LaneletSubmap& laneletSubmap,
                                      const traffic_rules::TrafficRules& trafficRules,
                                      const RoutingCostPtrs& routingCosts, const RoutingGraph::Configuration& config) {
   return internal::RoutingGraphBuilder(trafficRules, routingCosts, config).build(laneletSubmap);
 }
 
+// 根据最短路径，实现路由
 Optional<Route> RoutingGraph::getRoute(const ConstLanelet& from, const ConstLanelet& to, RoutingCostId routingCostId,
                                        bool withLaneChanges) const {
   auto optPath{shortestPath(from, to, routingCostId, withLaneChanges)};
@@ -343,6 +361,7 @@ Optional<Route> RoutingGraph::getRoute(const ConstLanelet& from, const ConstLane
   return internal::RouteBuilder(*graph_).getRouteFromShortestPath(*optPath, withLaneChanges, routingCostId);
 }
 
+// 通过最短路径实现路由，但是路由要经过某一个lanelet
 Optional<Route> RoutingGraph::getRouteVia(const ConstLanelet& from, const ConstLanelets& via, const ConstLanelet& to,
                                           RoutingCostId routingCostId, bool withLaneChanges) const {
   auto optPath{shortestPathVia(from, via, to, routingCostId, withLaneChanges)};
@@ -352,11 +371,13 @@ Optional<Route> RoutingGraph::getRouteVia(const ConstLanelet& from, const ConstL
   return internal::RouteBuilder(*graph_).getRouteFromShortestPath(*optPath, withLaneChanges, routingCostId);
 }
 
+// 获取从from到to的最短路径 LaneletPath
 Optional<LaneletPath> RoutingGraph::shortestPath(const ConstLanelet& from, const ConstLanelet& to,
                                                  RoutingCostId routingCostId, bool withLaneChanges) const {
   return shortestPathImpl<LaneletPath, ConstLanelet>(from, to, routingCostId, withLaneChanges, false, *graph_);
 }
 
+// 实现最短路径，但是包含Area
 Optional<LaneletOrAreaPath> RoutingGraph::shortestPathIncludingAreas(const ConstLaneletOrArea& from,
                                                                      const ConstLaneletOrArea& to,
                                                                      RoutingCostId routingCostId,
@@ -365,6 +386,7 @@ Optional<LaneletOrAreaPath> RoutingGraph::shortestPathIncludingAreas(const Const
                                                                  *graph_);
 }
 
+// 实现最短路径，但是最短路径中包含某一个lanelet
 Optional<LaneletPath> RoutingGraph::shortestPathVia(const ConstLanelet& start, const ConstLanelets& via,
                                                     const ConstLanelet& end, RoutingCostId routingCostId,
                                                     bool withLaneChanges) const {
@@ -373,6 +395,7 @@ Optional<LaneletPath> RoutingGraph::shortestPathVia(const ConstLanelet& start, c
       routePoints, [&](auto& from, auto& to) { return this->shortestPath(from, to, routingCostId, withLaneChanges); });
 }
 
+// 实现最短路径，路径可以经过area，且路径必须通过某一个lanelet or area
 Optional<LaneletOrAreaPath> RoutingGraph::shortestPathIncludingAreasVia(const ConstLaneletOrArea& start,
                                                                         const ConstLaneletOrAreas& via,
                                                                         const ConstLaneletOrArea& end,
@@ -384,6 +407,7 @@ Optional<LaneletOrAreaPath> RoutingGraph::shortestPathIncludingAreasVia(const Co
   });
 }
 
+// 找到两个lanelet在图中所对应的边，然后返回边的关系
 Optional<RelationType> RoutingGraph::routingRelation(const ConstLanelet& from, const ConstLanelet& to,
                                                      bool includeConflicting) const {
   auto edgeInfo = includeConflicting ? graph_->getEdgeInfo(from, to)
@@ -394,11 +418,13 @@ Optional<RelationType> RoutingGraph::routingRelation(const ConstLanelet& from, c
   return {};
 }
 
+// 在图中找到lanelet的出度边邻居
 ConstLanelets RoutingGraph::following(const ConstLanelet& lanelet, bool withLaneChanges) const {
   auto subgraph = withLaneChanges ? graph_->withLaneChanges() : graph_->withoutLaneChanges();
   return getLaneletEdgesFromGraph(*graph_, subgraph, lanelet, true);
 }
 
+// 在图中找到lanelet的出度边邻居，返回当前lanelet与其出度边邻居的关系
 LaneletRelations RoutingGraph::followingRelations(const ConstLanelet& lanelet, bool withLaneChanges) const {
   ConstLanelets foll{following(lanelet, withLaneChanges)};
   LaneletRelations result;
@@ -408,11 +434,13 @@ LaneletRelations RoutingGraph::followingRelations(const ConstLanelet& lanelet, b
   return result;
 }  // namespace routing
 
+// 在图中找到lanelet的入度边邻居
 ConstLanelets RoutingGraph::previous(const ConstLanelet& lanelet, bool withLaneChanges) const {
   auto subgraph = withLaneChanges ? graph_->withLaneChanges(0) : graph_->withoutLaneChanges(0);
   return getLaneletEdgesFromGraph(*graph_, subgraph, lanelet, false);
 }
 
+// 在图中找到lanelet的入度边邻居，返回当前lanelet与其入度边邻居的关系
 LaneletRelations RoutingGraph::previousRelations(const ConstLanelet& lanelet, bool withLaneChanges) const {
   ConstLanelets prev{previous(lanelet, withLaneChanges)};
   LaneletRelations result;
@@ -440,34 +468,41 @@ ConstLanelets RoutingGraph::besides(const ConstLanelet& lanelet) const {
   return result;
 }
 
+// 返回lanelet的一个左邻居
 Optional<ConstLanelet> RoutingGraph::left(const ConstLanelet& lanelet) const {
   return ifLaneletInGraph(*graph_, lanelet,
                           [this](auto& vertex) { return neighboringLaneletImpl(vertex, graph_->left()); });
 }
 
+// 返回lanelet的相邻的一个左邻居
 Optional<ConstLanelet> RoutingGraph::adjacentLeft(const ConstLanelet& lanelet) const {
   return ifLaneletInGraph(*graph_, lanelet,
                           [this](auto& vertex) { return neighboringLaneletImpl(vertex, graph_->adjacentLeft()); });
 }
 
+// 返回lanelet的一个右邻居
 Optional<ConstLanelet> RoutingGraph::right(const ConstLanelet& lanelet) const {
   return ifLaneletInGraph(*graph_, lanelet,
                           [this](auto& vertex) { return neighboringLaneletImpl(vertex, graph_->right()); });
 }
 
+// 返回lanelet的相邻的一个右邻居
 Optional<ConstLanelet> RoutingGraph::adjacentRight(const ConstLanelet& lanelet) const {
   return ifLaneletInGraph(*graph_, lanelet,
                           [this](auto& vertex) { return neighboringLaneletImpl(vertex, graph_->adjacentRight()); });
 }
 
+// 找到lanelet所对应的所有左邻居
 ConstLanelets RoutingGraph::lefts(const ConstLanelet& lanelet) const {
   return getUntilEnd(lanelet, [this](const ConstLanelet& llt) { return left(llt); });
 }
 
+// 找到lanelet所对应的所有相邻的左邻居
 ConstLanelets RoutingGraph::adjacentLefts(const ConstLanelet& lanelet) const {
   return getUntilEnd(lanelet, [this](const ConstLanelet& llt) { return adjacentLeft(llt); });
 }
 
+// 返回lanelet左边所有邻居的关系
 LaneletRelations RoutingGraph::leftRelations(const ConstLanelet& lanelet) const {
   bool leftReached{false};
   ConstLanelet current = lanelet;
@@ -488,14 +523,17 @@ LaneletRelations RoutingGraph::leftRelations(const ConstLanelet& lanelet) const 
   return result;
 }
 
+// 返回lanelet所对应的所有右邻居
 ConstLanelets RoutingGraph::rights(const ConstLanelet& lanelet) const {
   return getUntilEnd(lanelet, [this](const ConstLanelet& llt) { return right(llt); });
 }
 
+// 返回lanelet所对应的所有相邻的右邻居
 ConstLanelets RoutingGraph::adjacentRights(const ConstLanelet& lanelet) const {
   return getUntilEnd(lanelet, [this](const ConstLanelet& llt) { return adjacentRight(llt); });
 }
 
+// 返回lanelet所对应的所有右边邻居的关系
 LaneletRelations RoutingGraph::rightRelations(const ConstLanelet& lanelet) const {
   bool rightReached{false};
   ConstLanelet current = lanelet;
@@ -516,10 +554,12 @@ LaneletRelations RoutingGraph::rightRelations(const ConstLanelet& lanelet) const
   return result;
 }
 
+// 返回所有与laneletOrArea的关系为conflicting的laneletOrArea
 ConstLaneletOrAreas RoutingGraph::conflicting(const ConstLaneletOrArea& laneletOrArea) const {
   return getAllEdgesFromGraph(*graph_, graph_->conflicting(), laneletOrArea, true);
 }
 
+// 返回从lanelet出发，在图中能到达的lanelet的集合，且代价值不超过maxRoutingCost
 ConstLanelets RoutingGraph::reachableSet(const ConstLanelet& lanelet, double maxRoutingCost,
                                          RoutingCostId routingCostId, bool allowLaneChanges) const {
   auto start = graph_->getVertex(lanelet);
@@ -530,6 +570,7 @@ ConstLanelets RoutingGraph::reachableSet(const ConstLanelet& lanelet, double max
   return reachableSetImpl<false, ConstLanelet>(*start, graph, StopIfCostMoreThan<true>{maxRoutingCost});
 }
 
+// 返回从lanelet出发，在图中能到达的lanelet的集合，且代价值不超过maxRoutingCost
 ConstLaneletOrAreas RoutingGraph::reachableSetIncludingAreas(const ConstLaneletOrArea& llOrAr, double maxRoutingCost,
                                                              RoutingCostId routingCostId) const {
   auto start = graph_->getVertex(llOrAr);
@@ -540,6 +581,7 @@ ConstLaneletOrAreas RoutingGraph::reachableSetIncludingAreas(const ConstLaneletO
   return reachableSetImpl<false, ConstLaneletOrArea>(*start, graph, StopIfCostMoreThan<true>{maxRoutingCost});
 }
 
+// 返回能到达lanelet的lanelet的集合，且代价值不能超过maxRoutingCost
 ConstLanelets RoutingGraph::reachableSetTowards(const ConstLanelet& lanelet, double maxRoutingCost,
                                                 RoutingCostId routingCostId, bool allowLaneChanges) const {
   auto start = graph_->getVertex(lanelet);
@@ -550,6 +592,7 @@ ConstLanelets RoutingGraph::reachableSetTowards(const ConstLanelet& lanelet, dou
   return reachableSetImpl<true, ConstLanelet>(*start, graph, StopIfCostMoreThan<true>{maxRoutingCost});
 }
 
+// 从startPoint出发，计算最短路径，但是由于限制条件有些点无法到达，该方法计算从startPoint到这些点的可能路径
 LaneletPaths RoutingGraph::possiblePaths(const ConstLanelet& startPoint, double minRoutingCost,
                                          RoutingCostId routingCostId, bool allowLaneChanges) const {
   auto start = graph_->getVertex(startPoint);
@@ -560,6 +603,7 @@ LaneletPaths RoutingGraph::possiblePaths(const ConstLanelet& startPoint, double 
   return possiblePathsImpl<false, ConstLanelet, LaneletPath>(*start, graph, StopIfCostMoreThan<>{minRoutingCost});
 }
 
+// 同上，但是限制条件为lanelet的个数，而不是代价值
 LaneletPaths RoutingGraph::possiblePaths(const ConstLanelet& startPoint, uint32_t minLanelets, bool allowLaneChanges,
                                          RoutingCostId routingCostId) const {
   auto start = graph_->getVertex(startPoint);
@@ -570,6 +614,7 @@ LaneletPaths RoutingGraph::possiblePaths(const ConstLanelet& startPoint, uint32_
   return possiblePathsImpl<false, ConstLanelet, LaneletPath>(*start, graph, StopIfLaneletsMoreThan<>{minLanelets});
 }
 
+// 同上，只是所用的图，经过了旋转
 LaneletPaths RoutingGraph::possiblePathsTowards(const ConstLanelet& targetLanelet, double minRoutingCost,
                                                 RoutingCostId routingCostId, bool allowLaneChanges) const {
   auto start = graph_->getVertex(targetLanelet);
@@ -580,6 +625,7 @@ LaneletPaths RoutingGraph::possiblePathsTowards(const ConstLanelet& targetLanele
   return possiblePathsImpl<true, ConstLanelet, LaneletPath>(*start, graph, StopIfCostMoreThan<>{minRoutingCost});
 }
 
+// 同上，只是所用的代价为最小的lanelet数量
 LaneletPaths RoutingGraph::possiblePathsTowards(const ConstLanelet& targetLanelet, uint32_t minLanelets,
                                                 bool allowLaneChanges, RoutingCostId routingCostId) const {
   auto start = graph_->getVertex(targetLanelet);
@@ -590,6 +636,7 @@ LaneletPaths RoutingGraph::possiblePathsTowards(const ConstLanelet& targetLanele
   return possiblePathsImpl<true, ConstLanelet, LaneletPath>(*start, graph, StopIfLaneletsMoreThan<>{minLanelets});
 }
 
+// 可能路径，但是经过Area, 限制条件为代价值
 LaneletOrAreaPaths RoutingGraph::possiblePathsIncludingAreas(const ConstLaneletOrArea& startPoint,
                                                              double minRoutingCost, RoutingCostId routingCostId,
                                                              bool allowLaneChanges) const {
@@ -603,6 +650,7 @@ LaneletOrAreaPaths RoutingGraph::possiblePathsIncludingAreas(const ConstLaneletO
                                                                          StopIfCostMoreThan<>{minRoutingCost});
 }
 
+// 同上，限制条件为lanelet数量
 LaneletOrAreaPaths RoutingGraph::possiblePathsIncludingAreas(const ConstLaneletOrArea& startPoint, uint32_t minElements,
                                                              bool allowLaneChanges, RoutingCostId routingCostId) const {
   auto start = graph_->getVertex(startPoint);
@@ -897,6 +945,7 @@ RoutingGraph::Errors RoutingGraph::checkValidity(bool throwOnError) const {
   return errors;
 }
 
+//RoutingGraph构造函数，仅仅初始化了两个私有变量
 RoutingGraph::RoutingGraph(std::unique_ptr<RoutingGraphGraph>&& graph, LaneletSubmapConstPtr&& passableMap)
     : graph_{std::move(graph)}, passableLaneletSubmap_{std::move(passableMap)} {}
 

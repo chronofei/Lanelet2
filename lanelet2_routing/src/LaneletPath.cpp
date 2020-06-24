@@ -322,6 +322,7 @@ void appendBounds(const Head& head, BoundsResult& br) {
 }
 }  // namespace
 
+// 在LaneletPath中取出，从当前位置到变道或者路径结束的所有lanelet
 LaneletSequence LaneletPath::getRemainingLane(LaneletPath::const_iterator laneletPosition) const {
   ConstLanelets lane;
   while (laneletPosition != lanelets_.end()) {

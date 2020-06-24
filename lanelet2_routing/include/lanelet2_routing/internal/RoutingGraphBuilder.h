@@ -54,6 +54,7 @@ class RoutingGraphBuilder {
   void assignCosts(const ConstLaneletOrArea& from, const ConstLaneletOrArea& to, const RelationType& relation);
   std::unique_ptr<RoutingGraphGraph> graph_;
   PointsLaneletMap pointsToLanelets_;  ///< A map of tuples (first or last left and right boundary points) to lanelets
+  // 记录双行道的id
   std::set<Id> bothWaysLaneletIds_;
   const traffic_rules::TrafficRules& trafficRules_;
   const RoutingCostPtrs& routingCosts_;

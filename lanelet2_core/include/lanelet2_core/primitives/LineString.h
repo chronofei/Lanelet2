@@ -386,6 +386,7 @@ class LineStringImpl : public Primitive<ConstLineStringT> {
   //! Move assign from a normal vector. Id and attributes stay unchanged.
   LineStringImpl& operator=(std::vector<Point3d>&& rhs) {
     if (inverted()) {
+	    // 此处逻辑有错误
       utils::invert(rhs);
     }
     points() = std::move(rhs);

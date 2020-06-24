@@ -11,18 +11,22 @@ using LaneletVertexId = GraphTraits::vertex_descriptor;
 using LaneletVertexIds = std::vector<LaneletVertexId>;
 using RouteLanelets = std::set<LaneletVertexId>;
 
+// 在容器c中找到元素t
 template <typename ContainerT, typename T>
 inline bool has(const ContainerT& c, const T& t) {
   return std::find(c.begin(), c.end(), t) != c.end();
 }
+// 在容器c中找到元素t
 template <typename ContainerT, typename T>
 inline bool has(const std::set<T>& c, const T& t) {
   return c.find(t) != c.end();
 }
+// 图g中的边e是否有RelationType R
 template <RelationType R, typename GraphT, typename EdgeT>
 inline bool hasRelation(const GraphT& g, EdgeT e) {
   return (g[e].relation & R) != RelationType::None;
 }
+// 在图中找到顶点ofVertex的出度边，在边中找到满足关系R的边，并返回边的汇点
 template <RelationType R, typename Graph>
 Optional<LaneletVertexId> getNext(LaneletVertexId ofVertex, const Graph& g) {
   auto edges = boost::out_edges(ofVertex, g);
@@ -33,6 +37,7 @@ Optional<LaneletVertexId> getNext(LaneletVertexId ofVertex, const Graph& g) {
   return {};
 }
 
+// 根据顶点和图结构，当Backwards为true是返回顶点的入度边，否则返回出度边
 // Class that selects between in_edges and out_edges (i wish I had c++17...)
 template <bool Backwards>
 struct GetEdges {};
@@ -51,6 +56,7 @@ struct GetEdges<false> {
   }
 };
 
+// 根据边的id和图，当backwards为true是返回边的源，否则返回汇点
 // Class that selects between in_edges and out_edges (i wish I had c++17...)
 template <bool Backwards>
 struct GetTarget {};
@@ -71,6 +77,7 @@ struct GetTarget<false> {
   }
 };
 
+// 判断有没有左右邻居存在, 先判断左邻居，在判断右邻居
 template <typename Vertex, typename Graph, typename Func>
 bool anySidewayNeighbourIs(Vertex v, const Graph& g, Func&& f) {
   Optional<LaneletVertexId> currVertex = v;
@@ -87,6 +94,7 @@ bool anySidewayNeighbourIs(Vertex v, const Graph& g, Func&& f) {
   return !!currVertex;
 }
 
+// 找到ofVertex所有的左右邻居
 template <typename Graph>
 std::set<LaneletVertexId> getAllNeighbourLanelets(LaneletVertexId ofVertex, const Graph& ofRoute) {
   std::set<LaneletVertexId> result{ofVertex};
@@ -103,6 +111,7 @@ std::set<LaneletVertexId> getAllNeighbourLanelets(LaneletVertexId ofVertex, cons
   return result;
 }
 
+// 图中满足RoutingostId和RelationType要求的边保留, 对边进行滤波
 //! Filter that reduces the original graph by edges that belong to different cost types or lane changes
 class OriginalGraphFilter {
  public:
@@ -126,6 +135,7 @@ class OriginalGraphFilter {
 };
 using OriginalGraph = boost::filtered_graph<GraphType, OriginalGraphFilter>;
 
+// 图中在RouteLanelets中的顶点保留, 对图顶点进行滤波，保留在onRoute_中的顶点
 //! Reduces the graph to a set of desired vertices
 class OnRouteFilter {
  public:
@@ -138,6 +148,7 @@ class OnRouteFilter {
   const RouteLanelets* onRoute_{};
 };
 
+// 图中 前进 左转 右转边保留
 //! Removes edges from the graph that are not drivable (e.g. adjacent or conflicing)
 class OnlyDrivableEdgesFilter {
  public:
@@ -152,6 +163,7 @@ class OnlyDrivableEdgesFilter {
   const OriginalGraph* originalGraph_{};
 };
 
+// 图中Conflicting边保留
 class OnlyConflictingFilter {
  public:
   OnlyConflictingFilter() = default;
@@ -165,6 +177,7 @@ class OnlyConflictingFilter {
   const OriginalGraph* originalGraph_{};
 };
 
+// 图中非Conflicting边保留
 //! Removes conflicting edges from the graph
 class NoConflictingFilter {
  public:
@@ -179,6 +192,7 @@ class NoConflictingFilter {
   const OriginalGraph* originalGraph_{};
 };
 
+// 如果lanelet的出度边连接到onRoute则返回true。对图中的顶点进行滤波，只要顶点与onRoute_中的顶点有关系，则保留
 //! Removes vertices from the graph that are not adjacent to a set of vertices. Adjacent can also mean conflicting!
 class NextToRouteFilter {
  public:
@@ -205,6 +219,8 @@ class NextToRouteFilter {
   const OriginalGraph* originalGraph_{};
 };
 
+// 如果一个lanelet2通过左转或者右转到达路由路径上，但不能通过左转或者右转从路由路径到达此lanelet，
+// 或者lanelet与路由路径上的lanelet conflicting,返回true, 不包含在onRoute_上的lanelet。
 //! Finds vertices that are in conflict or adjacent to some vertices (not reachable though bidirectional lane changes)
 class ConflictingSectionFilter {
  public:
@@ -251,6 +267,7 @@ class OnRouteAndConflictFilter {
                                     const OriginalGraph& g)
       : onRoute_{&onRoute}, conflictWith_{&conflictWith}, g_{&g} {}
 
+  // vertexId是onRoute_中的点，找它的出度边，如果有一条边是conflicting，并且边的汇点包含于conflictWith，返回true
   bool operator()(LaneletVertexId vertexId) const {
     auto isOk = anySidewayNeighbourIs(vertexId, *g_, [&](auto v) {
       if (!has(*onRoute_, vertexId)) {

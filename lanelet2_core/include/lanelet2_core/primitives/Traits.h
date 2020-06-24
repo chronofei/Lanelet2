@@ -111,6 +111,7 @@ ConstPrimitiveType<PrimitiveT> toConst(const PrimitiveT& primitive) {
 
 template <typename PrimitiveT>
 constexpr bool isConst() {
+	// 判断两模板类型是否一致
   return std::is_same<PrimitiveT, ConstPrimitiveType<PrimitiveT>>::value;
 }
 
@@ -161,6 +162,7 @@ using ConstPointT = typename PointTraits<PointT>::ConstPoint;
 template <typename PointT>
 using MutablePointT = typename PointTraits<PointT>::MutablePoint;
 
+// c++新特性 后置返回类型
 template <typename PointT>
 auto toBasicPoint(const PointT& point) -> std::enable_if_t<PointTraits<PointT>::IsPrimitive, BasicPointT<PointT>> {
   return point.basicPoint();

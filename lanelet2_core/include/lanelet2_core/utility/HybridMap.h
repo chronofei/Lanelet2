@@ -79,6 +79,7 @@ class HybridMap {
   using value_type = typename Map::value_type;            // NOLINT
   using difference_type = typename Map::difference_type;  // NOLINT
   using size_type = typename Map::size_type;              // NOLINT
+  // noexcept 表明此函数编译时没有错误
   HybridMap() noexcept = default;
   HybridMap(HybridMap&& rhs) noexcept : m_(std::move(rhs.m_)), v_{std::move(rhs.v_)} {
     // move invalidates no iterators except end

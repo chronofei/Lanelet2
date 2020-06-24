@@ -67,6 +67,7 @@ void addRelation(std::map<DebugEdge, LineString3d>& edgeMap, std::map<Id, Point2
       lineStringMapIt->second.front().id() == fromPointIt->first ? "relation_" : "relation_reverse_";
   for (size_t it = 1; it >= 1; it++) {  /// Finding the next unused attribute.
     auto attr = direction + std::to_string(it);
+    // 两个lanelets之间可能不止有一种关系
     if (!lineStringMapIt->second.hasAttribute(attr)) {
       lineStringMapIt->second.setAttribute(attr, relationToString(relation));
       break;
@@ -74,6 +75,7 @@ void addRelation(std::map<DebugEdge, LineString3d>& edgeMap, std::map<Id, Point2
   }
 }
 
+// remainingLane的具体实现
 LaneletSequence remainingLaneImpl(RouteGraph::Vertex v, const FilteredRouteGraph& g) {
   ConstLanelets lane;
   auto start = v;
@@ -94,6 +96,7 @@ LaneletSequence remainingLaneImpl(RouteGraph::Vertex v, const FilteredRouteGraph
   return LaneletSequence{std::move(lane)};
 }
 
+// 假设Backwards为false，根据v，求得顶点的出度边，遍历出度边，找到每条边的关系
 template <bool Backwards = false>
 LaneletRelations getRelations(RouteGraph::Vertex v, const FilteredRouteGraph& g) {
   auto out = internal::GetEdges<Backwards>{}(v, g);
@@ -101,6 +104,8 @@ LaneletRelations getRelations(RouteGraph::Vertex v, const FilteredRouteGraph& g)
     return LaneletRelation{g[internal::GetTarget<Backwards>{}(e, g)].lanelet, g[e].relation};
   });
 }
+
+// 假设Backwards为false，根据v，求得顶点的出度边，遍历出度边，找到对应的lanelet
 template <bool Backwards = false>
 ConstLanelets getLanelets(RouteGraph::Vertex v, const FilteredRouteGraph& g) {
   auto out = internal::GetEdges<Backwards>{}(v, g);
@@ -108,6 +113,7 @@ ConstLanelets getLanelets(RouteGraph::Vertex v, const FilteredRouteGraph& g) {
                           [&g](auto e) { return g[internal::GetTarget<Backwards>{}(e, g)].lanelet; });
 }
 
+// 求当前顶点v,其中一条出度边的关系
 Optional<LaneletRelation> getSingleRelation(RouteGraph::Vertex v, const FilteredRouteGraph& g) {
   auto outEdges = boost::out_edges(v, g);
   if (outEdges.first == outEdges.second) {
@@ -127,6 +133,7 @@ std::pair<Optional<RouteGraph::Vertex>, RelationType> getNextVertex(RouteGraph::
 
 }  // anonymous namespace
 
+// 构造函数
 Route::Route() = default;
 Route::~Route() noexcept = default;
 Route& Route::operator=(Route&& other) noexcept = default;
@@ -134,6 +141,7 @@ Route::Route(Route&& other) noexcept = default;
 Route::Route(LaneletPath shortestPath, std::unique_ptr<RouteGraph> graph, LaneletSubmapConstPtr laneletSubmap) noexcept
     : graph_{std::move(graph)}, shortestPath_{std::move(shortestPath)}, laneletSubmap_{std::move(laneletSubmap)} {}
 
+// 在shortestPath_中取出从ll开始到最后的所有lanelet
 LaneletPath Route::remainingShortestPath(const ConstLanelet& ll) const {
   auto iter = std::find(shortestPath_.begin(), shortestPath_.end(), ll);
   if (iter == shortestPath_.end()) {
@@ -157,6 +165,7 @@ LaneletSequence Route::fullLane(const ConstLanelet& ll) const {
   }
   auto g = graph_->withoutLaneChanges();
   auto begin = *v;
+  // 找到当前lanelet所在lane的第一个lanelet，也就是说找到第一个汇点，或者分杈点
   while (true) {
     auto inEdges = boost::in_edges(*v, g);
     if (std::distance(inEdges.first, inEdges.second) != 1) {
@@ -174,6 +183,7 @@ LaneletSequence Route::fullLane(const ConstLanelet& ll) const {
   return remainingLaneImpl(*v, g);
 }
 
+// 找到当前lanelet所在的lane的剩余的lanelet
 LaneletSequence Route::remainingLane(const ConstLanelet& ll) const {
   auto v = graph_->getVertex(ll);
   if (!v) {
@@ -182,11 +192,13 @@ LaneletSequence Route::remainingLane(const ConstLanelet& ll) const {
   return remainingLaneImpl(*v, graph_->withoutLaneChanges());
 }
 
+// 返回中心线的长度
 double Route::length2d() const {
   return std::accumulate(shortestPath_.begin(), shortestPath_.end(), 0.,
                          [](double num, const ConstLanelet& ll) { return num + geometry::length2d(ll); });
 }
 
+// 图结构中一共有多少顶点
 size_t Route::numLanes() const {
   std::set<LaneId> lanes;
   auto& g = graph_->get();
@@ -196,6 +208,7 @@ size_t Route::numLanes() const {
   return lanes.size();
 }
 
+// 以lanelet的中心点为点，并将两点间的关系添加到map中，最终通过点和线历来构建LaneletMap
 LaneletMapPtr Route::getDebugLaneletMap() const {
   // we need std::map because of its iterator validity guarantee at insertion
   std::map<DebugEdge, LineString3d> edgeMap;
@@ -219,6 +232,7 @@ LaneletMapPtr Route::getDebugLaneletMap() const {
   return map;
 }
 
+// 返回lanelet的个数，即图结构中顶点的个数
 size_t Route::size() const { return boost::num_vertices(graph_->get()); }
 
 LaneletRelations Route::followingRelations(const ConstLanelet& lanelet) const {
@@ -229,6 +243,7 @@ LaneletRelations Route::followingRelations(const ConstLanelet& lanelet) const {
   return getRelations(*v, graph_->withoutLaneChanges());
 }
 
+// 返回lanelet，下面的lanelet
 ConstLanelets Route::following(const ConstLanelet& lanelet) const {
   auto v = graph_->getVertex(lanelet);
   if (!v) {
@@ -261,6 +276,7 @@ Optional<LaneletRelation> Route::leftRelation(const ConstLanelet& lanelet) const
   return getSingleRelation(*v, graph_->somehowLeft());
 }
 
+// 找到当前lanelet左边的lanelet，所有的左边的lanelet
 LaneletRelations Route::leftRelations(const ConstLanelet& lanelet) const {
   LaneletRelations result;
   auto next = graph_->getVertex(lanelet);

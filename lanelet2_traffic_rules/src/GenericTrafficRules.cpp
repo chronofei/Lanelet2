@@ -21,10 +21,12 @@ Value getMapOrDefault(const Map& map, Key key, Value defaultVal) {
   return elem->second;
 }
 
+// 从str的第一个字符开始比较，str是否包含substr
 bool startswith(const std::string& str, const std::string& substr) {
   return str.compare(0, substr.size(), substr) == 0;
 }
 
+// 根据道路type、subtype及参与者判断当前道路是否支持换道
 LaneChangeType getChangeType(const std::string& type, const std::string& subtype, const std::string& participant) {
   using LaneChangeMap = std::map<std::pair<std::string, std::string>, LaneChangeType>;
   const static LaneChangeMap VehicleChangeType{
@@ -53,6 +55,7 @@ LaneChangeType getChangeType(const std::string& type, const std::string& subtype
   return LaneChangeType::None;
 }
 
+// 从lanelet的边界属性上判断是否可以改变车道
 Optional<LaneChangeType> getHardcodedChangeType(const ConstLineString3d& boundary) {
   if (boundary.hasAttribute(AttributeNamesString::LaneChange)) {
     if (boundary.attributeOr(AttributeNamesString::LaneChange, false)) {
@@ -78,6 +81,7 @@ Optional<LaneChangeType> getHardcodedChangeType(const ConstLineString3d& boundar
   return {false, LaneChangeType::None};
 }
 
+// attrs任何一个属性名字是否包含overridePrefix
 bool hasOverride(const AttributeMap& attrs, const std::string& overridePrefix) {
   return utils::anyOf(attrs, [&overridePrefix](auto& attr) { return startswith(attr.first, overridePrefix); });
 }
@@ -98,6 +102,8 @@ T getOverride(const AttributeMap& attrs, const std::string& overridePrefix, cons
   return overrideAttr->second.template as<T>().get_value_or(defaultVal);
 }
 
+// 判断是否可以沿着lanelet的方向行使,只是一个方向的判断
+// 可以看成是构造图结构的时候，lanelet所代表的这条有向边是否存在
 bool isDrivingDir(const lanelet::ConstLanelet& ll, const std::string& participant) {
   if (!ll.inverted()) {
     return true;
@@ -106,10 +112,12 @@ bool isDrivingDir(const lanelet::ConstLanelet& ll, const std::string& participan
   if (!!hasOneWay) {
     return !*hasOneWay;
   }
+  // 判断ll的属性中有没有定义OneWay
   if (hasOverride(ll.attributes(), AttributeNamesString::OneWay)) {
     return !getOverride(ll.attributes(), AttributeNamesString::OneWay,
                         AttributeNamesString::OneWay + (":" + participant), true);
   }
+  // Participants结构在lanelet2_core模块的Attribute.h文件夹中定义
   return participant == Participants::Pedestrian;
 }
 
@@ -129,6 +137,7 @@ bool GenericTrafficRules::hasDynamicRules(const ConstLanelet& lanelet) const {
   return std::any_of(regelems.begin(), regelems.end(), isDynamic);
 }
 
+// 首先是驾驶方向的判断，接着时交通规则的判断，在时车道类型与交通参与者的判断，最后是交通类型和地区的判断
 bool GenericTrafficRules::canPass(const lanelet::ConstLanelet& lanelet) const {
   if (!isDrivingDir(lanelet, participant())) {
     return false;
@@ -145,6 +154,7 @@ bool GenericTrafficRules::canPass(const lanelet::ConstLanelet& lanelet) const {
       .get_value_or(false);
 }
 
+// 与lanelet相比，area无方向，所以直接从交通规则开始判断，然后是交通参与者，最后才是通过交通类型和所在地区进行判断
 bool GenericTrafficRules::canPass(const ConstArea& area) const {
   auto canPassByRule = canPass(area.regulatoryElements());
   if (!!canPassByRule) {
@@ -157,6 +167,7 @@ bool GenericTrafficRules::canPass(const ConstArea& area) const {
       .get_value_or(false);
 }
 
+// 首先根据边界属性是否定义了可变道，若没有定义则通过边界线的type和subtype进行推断是否可以边界
 LaneChangeType GenericTrafficRules::laneChangeType(const ConstLineString3d& boundary,
                                                    bool virtualIsPassable = false) const {
   using namespace std::string_literals;
@@ -169,6 +180,7 @@ LaneChangeType GenericTrafficRules::laneChangeType(const ConstLineString3d& boun
     if (virtualIsPassable && type == AttributeValueString::Virtual) {
       return LaneChangeType::Both;
     }
+    // 根据边界的线性和交通参与者是否判断是否可以变道
     changeType = getChangeType(type, boundary.attributeOr(AttributeName::Subtype, ""s), participant());
   }
   // handle inverted ls
@@ -183,6 +195,7 @@ LaneChangeType GenericTrafficRules::laneChangeType(const ConstLineString3d& boun
   return changeType;
 }
 
+// geometry::follows判断from和to是否是前驱和后继的关系
 bool GenericTrafficRules::canPass(const ConstLanelet& from, const ConstLanelet& to) const {
   return geometry::follows(from, to) && canPass(from) && canPass(to);
 }
@@ -233,6 +246,7 @@ bool GenericTrafficRules::canPass(const ConstArea& from, const ConstLanelet& to)
   return false;
 }
 
+// ????
 bool GenericTrafficRules::canPass(const ConstArea& from, const ConstArea& to) const {
   if (!canPass(from) && canPass(to)) {
     return false;
@@ -258,6 +272,7 @@ bool GenericTrafficRules::canChangeLane(const ConstLanelet& from, const ConstLan
   return isLeft ? canChangeToRight(type) : canChangeToLeft(type);
 }
 
+// 根据交通参与者和交通所在位置，确定道路速度限制
 SpeedLimitInformation getSpeedLimitFromType(const AttributeMap& attributes, const CountrySpeedLimits& countryLimits,
                                             const std::string& participant) {
   using Value = AttributeValueString;
@@ -290,12 +305,13 @@ SpeedLimitInformation getSpeedLimitFromType(const AttributeMap& attributes, cons
   return {};
 }
 
+// 首先根据交通规则，其次参考道路属性，最后，根据交通参与者与道路所在位置，判断道路速度限制
 SpeedLimitInformation GenericTrafficRules::speedLimit(const RegulatoryElementConstPtrs& regelems,
                                                       const AttributeMap& attributes) const {
   using namespace std::string_literals;
   using namespace units::literals;
   using Attr = AttributeNamesString;
-  auto regelemSpeedLimit = speedLimit(regelems);
+  auto regelemSpeedLimit = speedLimit(regelems);  // 此处返回交通规则中定义的速度限制
   if (!!regelemSpeedLimit) {
     return *regelemSpeedLimit;
   }
@@ -323,6 +339,7 @@ const std::string& TrafficRules::participant() const { return config_.at("partic
 
 const std::string& TrafficRules::location() const { return config_.at("location").value(); }
 
+// 此处的类型为道路类型，首先定义了道路类型及其参与者，然后根据type确定潜在道路参与者，最后根据当前的道路参与者判断是否可以在此道路同行
 Optional<bool> GenericTrafficRules::canPass(const std::string& type, const std::string& /*location*/) const {
   using ParticantsMap = std::map<std::string, std::vector<std::string>>;
   using Value = AttributeValueString;

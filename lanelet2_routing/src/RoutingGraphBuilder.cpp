@@ -91,6 +91,7 @@ RoutingGraphBuilder::RoutingGraphBuilder(const traffic_rules::TrafficRules& traf
 RoutingGraphUPtr RoutingGraphBuilder::build(const LaneletMapLayers& laneletMapLayers) {
   auto passableLanelets = getPassableLanelets(laneletMapLayers.laneletLayer, trafficRules_);
   auto passableAreas = getPassableAreas(laneletMapLayers.areaLayer, trafficRules_);
+  // 根据可通行的lanelets和areas，构建一个laneletSubmap
   auto passableMap = utils::createConstSubmap(passableLanelets, passableAreas);
   appendBidirectionalLanelets(passableLanelets);
   addLaneletsToGraph(passableLanelets);
@@ -100,6 +101,7 @@ RoutingGraphUPtr RoutingGraphBuilder::build(const LaneletMapLayers& laneletMapLa
   return std::make_unique<RoutingGraph>(std::move(graph_), std::move(passableMap));
 }
 
+// 根据交通规则，在lanelets中取出可以通行的lanelet
 ConstLanelets RoutingGraphBuilder::getPassableLanelets(const LaneletLayer& lanelets,
                                                        const traffic_rules::TrafficRules& trafficRules) {
   ConstLanelets llts;
@@ -109,6 +111,7 @@ ConstLanelets RoutingGraphBuilder::getPassableLanelets(const LaneletLayer& lanel
   return llts;
 }
 
+// 根据交通规则，在areas中取出可以通行的area
 ConstAreas RoutingGraphBuilder::getPassableAreas(const AreaLayer& areas,
                                                  const traffic_rules::TrafficRules& trafficRules) {
   ConstAreas ars;
@@ -118,6 +121,7 @@ ConstAreas RoutingGraphBuilder::getPassableAreas(const AreaLayer& areas,
   return ars;
 }
 
+// 判断每个车道是否是双行道，如果是则记录其id，并将其添加到图结构中
 void RoutingGraphBuilder::appendBidirectionalLanelets(ConstLanelets& llts) {
   std::deque<ConstLanelet> invLanelets;
   for (auto& ll : llts) {
@@ -129,6 +133,7 @@ void RoutingGraphBuilder::appendBidirectionalLanelets(ConstLanelets& llts) {
   llts.insert(llts.end(), invLanelets.begin(), invLanelets.end());
 }
 
+// 将每条可通行的lanelet，看成是图结构中的有向边，并将其添加到图结构中
 void RoutingGraphBuilder::addLaneletsToGraph(ConstLanelets& llts) {
   for (auto& ll : llts) {
     graph_->addVertex(VertexInfo{ll});
@@ -136,12 +141,14 @@ void RoutingGraphBuilder::addLaneletsToGraph(ConstLanelets& llts) {
   }
 }
 
+// 同上面的lanelet
 void RoutingGraphBuilder::addAreasToGraph(ConstAreas& areas) {
   for (auto& ar : areas) {
     graph_->addVertex(VertexInfo{ar});
   }
 }
 
+// 根据lanelets的连通情况，添加图的边
 void RoutingGraphBuilder::addEdges(const ConstLanelets& lanelets, const LaneletLayer& passableLanelets) {
   LaneChangeLaneletsCollector leftToRight;
   LaneChangeLaneletsCollector rightToLeft;
@@ -166,6 +173,7 @@ void RoutingGraphBuilder::addEdges(const ConstAreas& areas, const LaneletLayer& 
   }
 }
 
+// 找到当前lanelet的successor，并将两者生成的边添加到图中
 void RoutingGraphBuilder::addFollowingEdges(const ConstLanelet& ll) {
   auto endPointsLanelets =
       pointsToLanelets_.equal_range(orderedIdPair(ll.leftBound().back().id(), ll.rightBound().back().id()));
@@ -192,6 +200,7 @@ void RoutingGraphBuilder::addFollowingEdges(const ConstLanelet& ll) {
   }
 }
 
+// 首先找到与ll，有相同左边界的lanelet，然后判断它们是否已经有边，在几何上是否相邻，然后给计算它们边的信息，并将边加入到图结构中
 void RoutingGraphBuilder::addSidewayEdge(LaneChangeLaneletsCollector& laneChangeLanelets, const ConstLanelet& ll,
                                          const ConstLineString3d& bound, const RelationType& relation) {
   auto directlySideway = [&relation, &ll](const ConstLanelet& sideLl) {
@@ -210,6 +219,7 @@ void RoutingGraphBuilder::addSidewayEdge(LaneChangeLaneletsCollector& laneChange
   }
 }
 
+// 查找与当前ll相重叠，或者相交叉的路,并向图中添加相应的边
 void RoutingGraphBuilder::addConflictingEdge(const ConstLanelet& ll, const LaneletLayer& passableLanelets) {
   // Conflicting
   ConstLanelets results = passableLanelets.search(geometry::boundingBox2d(ll));
@@ -237,6 +247,7 @@ void RoutingGraphBuilder::addConflictingEdge(const ConstLanelet& ll, const Lanel
   }
 }
 
+// 不仅检查当前的lanelet，还要检查当前lanelet的前一条lanelet和后一条lanelet，是否可以变道
 void RoutingGraphBuilder::addLaneChangeEdges(LaneChangeLaneletsCollector& laneChanges, const RelationType& relation) {
   auto getSuccessors = [this](auto beginEdgeIt, auto endEdgeIt) {
     ConstLanelets nexts;
@@ -248,10 +259,12 @@ void RoutingGraphBuilder::addLaneChangeEdges(LaneChangeLaneletsCollector& laneCh
     }
     return nexts;
   };
+  // 找到当前llt的出度边
   auto next = [this, &getSuccessors](const ConstLanelet& llt) {
     auto edges = boost::out_edges(*graph_->getVertex(llt), graph_->get());
     return getSuccessors(edges.first, edges.second);
   };
+  // 找到当前llt的入度边
   auto prev = [this, &getSuccessors](const ConstLanelet& llt) {
     auto edges = boost::in_edges(*graph_->getVertex(llt), graph_->get());
     return getSuccessors(edges.first, edges.second);
@@ -262,6 +275,7 @@ void RoutingGraphBuilder::addLaneChangeEdges(LaneChangeLaneletsCollector& laneCh
   }
 }
 
+// 添加area与lanelets之间的关系, 作为边添加到图中
 void RoutingGraphBuilder::addAreaEdge(const ConstArea& area, const LaneletLayer& passableLanelets) {
   auto candidates = passableLanelets.search(geometry::boundingBox2d(area));
   for (auto& candidate : candidates) {
@@ -293,6 +307,7 @@ void RoutingGraphBuilder::addAreaEdge(const ConstArea& area, const LaneletLayer&
   }
 }
 
+// 添加area与area之间的关系，作为边添加到图中
 void RoutingGraphBuilder::addAreaEdge(const ConstArea& area, const AreaLayer& passableAreas) {
   auto candidates = passableAreas.search(geometry::boundingBox2d(area));
   for (auto& candidate : candidates) {
@@ -311,6 +326,7 @@ void RoutingGraphBuilder::addAreaEdge(const ConstArea& area, const AreaLayer& pa
   }
 }
 
+// 在config_中寻找participantHeight
 Optional<double> RoutingGraphBuilder::participantHeight() const {
   auto height = config_.find(RoutingGraph::ParticipantHeight);
   if (height != config_.end()) {
@@ -319,6 +335,7 @@ Optional<double> RoutingGraphBuilder::participantHeight() const {
   return {};
 }
 
+// 建立一个映射关系，有lanelet的四条边到lanelet本身
 void RoutingGraphBuilder::addPointsToSearchIndex(const ConstLanelet& ll) {
   using PointLaneletPair = std::pair<IdPair, ConstLanelet>;
   pointsToLanelets_.insert(
@@ -331,6 +348,7 @@ void RoutingGraphBuilder::addPointsToSearchIndex(const ConstLanelet& ll) {
       PointLaneletPair(orderedIdPair(ll.rightBound().front().id(), ll.rightBound().back().id()), ll));
 }
 
+// 判断从from到to，是否已有边存在
 bool RoutingGraphBuilder::hasEdge(const ConstLanelet& from, const ConstLanelet& to) {
   return !!graph_->getEdgeInfo(from, to);
 }
@@ -354,6 +372,7 @@ void RoutingGraphBuilder::assignLaneChangeCosts(const ConstLanelets& froms, cons
   }
 }
 
+// 计算从from到to的边的信息，并将边加入到图中
 void RoutingGraphBuilder::assignCosts(const ConstLaneletOrArea& from, const ConstLaneletOrArea& to,
                                       const RelationType& relation) {
   for (RoutingCostId rci = 0; rci < RoutingCostId(routingCosts_.size()); rci++) {
